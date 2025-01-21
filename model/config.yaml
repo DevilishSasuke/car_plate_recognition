@@ -1,0 +1,7 @@
+path: data
+train: train\images # relative to 'path'
+val: valid\images # relative to 'path'
+
+# Classes
+names:
+  0: plate
