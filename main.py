@@ -2,6 +2,7 @@ import os
 import cv2
 from ultralytics import YOLO
 
+
 img_dir = os.path.join(os.getcwd(), 'img')
 target_size = (1080, 1920) # 1080p image size
 
@@ -46,7 +47,12 @@ def resize_with_padding(image):
   return cv2.copyMakeBorder(resized_img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=(0, 0, 0))
 
 def main():
-  model = YOLO("model/plates_model.pt")
+
+  model = YOLO("model/best.pt")
+
+  test_dir = os.path.join(os.getcwd(), 'test')
+  for filename in os.listdir(test_dir):
+    model.predict(source=os.path.join(test_dir, filename), save=True, conf=0.75)
 
   return None
 
