@@ -6,6 +6,7 @@ from utils import *
 red = (0, 0, 255)
 green = (0, 255, 0)
 blue = (255, 0, 0)
+white = (255, 255, 255)
 acceptable_classes = [2, 6] # Допустимые классы, которые модель будет распознавать
 def detect_cars_and_buses_on_video(video_path: str, 
                                    output_path: Optional[str] = "output.mp4", 
@@ -60,28 +61,31 @@ def process_frame(frame: np.ndarray, car_model: YOLO, plate_model: YOLO,
   # Отображение обнаруженных автомобилей и автобусов на кадре
   for cbox in get_boxes(car_results):
     if cbox.cls.item() in acceptable_classes:
-      draw_rectangle(frame, cbox, label=car_names[int(cbox.cls.item())], color=blue)
       
       x1, y1, x2, y2 = map(int, cbox.xyxy[0].tolist())
       vehicle_img = frame[y1:y2, x1:x2]
 
       # Обнаружение номерных знаков на обнаруженных машинах
-      plate_results = plate_model.predict(source=vehicle_img, save=False, conf=0.5)
+      plate_results = plate_model.predict(source=vehicle_img, save=False, conf=0.7)
+      draw_rectangle(frame, cbox, label=car_names[int(cbox.cls.item())], color=blue)
       for pbox in get_boxes(plate_results):
         x1_, y1_, x2_, y2_ = map(int, pbox.xyxy[0].tolist())
         plate_img = vehicle_img[y1_:y2_, x1_:x2_]
         plate_text = get_plate_text(plate_img)
-        draw_rectangle(vehicle_img, pbox, label=plate_text, color=red)
+        draw_rectangle(vehicle_img, pbox, label=plate_text, color=white)
 
   return frame
 
 def get_plate_text(plate_img: np.ndarray) -> str:
-  plate_img = enlarge_image(plate_img)
+  #plate_img = enlarge_image(plate_img)
   text = read_plate_text(plate_img)
 
   if text != "":
-    return remove_incorrect_chars(text)
-  return ""
+    corrected_text = remove_incorrect_chars(text)
+    if len(corrected_text) >= 6:
+      return make_replacements(corrected_text)
+    return corrected_text
+  return text
 
 
 if __name__ == "__main__":

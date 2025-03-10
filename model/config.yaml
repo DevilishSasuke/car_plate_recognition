@@ -1,4 +1,4 @@
-path: data
+path: E:\Desktop v2\ptzmash_plate_recognition\datasets\data
 train: train\images # relative to 'path'
 val: valid\images # relative to 'path'
 

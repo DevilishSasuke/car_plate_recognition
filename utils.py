@@ -72,4 +72,21 @@ def read_plate_text(plate_img: np.ndarray) -> str:
   return result
 
 def remove_incorrect_chars(plate_text: str) -> str:
-   return re_sub(fr"[^{plate_alphabet}]", "", plate_text).strip()
+  return re_sub(fr"[^{plate_alphabet}]", "", plate_text).strip()
+
+replacements = {
+    "0": "O", "8": "B", "2": "Z",
+  }
+def make_replacements(text: str) -> str:
+  letters = text[0] + text[4:6]
+  numbers = text[1:4]
+  region = ''
+  if len(text) > 6:
+    region = text[6:]
+
+  for k, v in replacements.items():
+    letters.replace(k, v)
+    numbers.replace(v, k)
+    region.replace(v, k)
+
+  return letters[0] + numbers + letters[1:] + region

@@ -8,10 +8,10 @@ def main():
   config_path = osjoin(osgetcwd(), 'config.yaml')
   results = model.train(data=config_path, 
                         epochs=100,
-                        lr0=0.005,
+                        lr0=0.007,
                         lrf=0.01,
                         warmup_bias_lr=0.05,
-                        optimizer='AdamW',
+                        optimizer='Adam',
                         )
 
 if __name__ == "__main__":
