@@ -59,7 +59,7 @@ def enlarge_image(img: np.ndarray) -> np.ndarray:
   return cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
 def read_plate_text(plate_img: np.ndarray) -> str:
-  texts = reader.readtext(plate_img)
+  texts = reader.readtext(plate_img, allowlist=plate_alphabet)
   result = ""
 
   for text in texts:
@@ -89,4 +89,4 @@ def make_replacements(text: str) -> str:
     numbers.replace(v, k)
     region.replace(v, k)
 
-  return letters[0] + numbers + letters[1:] + region
+  return f"{letters[0]}{numbers}{letters[1:]} {region}"
