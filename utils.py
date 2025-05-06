@@ -2,13 +2,13 @@ import cv2
 import numpy as np
 from typing import Optional, Generator, Tuple
 from ultralytics.engine.results import Boxes, Results
-from easyocr import Reader
+from paddleocr import PaddleOCR
 from re import sub as re_sub
 
 min_ph = 200 # минимальная высота номера(для увеличения)
 min_pw = 600 # минимальная ширина номера
 plate_alphabet = "ABEKMHOPCTYX0123456789" # алфавит доступных номерных символов
-reader = Reader(["en"]) # объект для чтения текста с изображения
+reader = PaddleOCR(use_angle_cls=False, lang='en') # объект для чтения текста с изображения
 
 def create_video_writer(cap: cv2.VideoCapture, output_path: str) -> cv2.VideoWriter:
   # Параметры видео
@@ -59,16 +59,16 @@ def enlarge_image(img: np.ndarray) -> np.ndarray:
   return cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
 
 def read_plate_text(plate_img: np.ndarray) -> str:
-  texts = reader.readtext(plate_img, allowlist=plate_alphabet)
-  result = ""
+  texts = reader.ocr(plate_img, cls=False)
+  result  = ""
 
-  for text in texts:
-    _, t, _ = text
-    t = t.upper().replace(" ", "")
-    result += t
-
-  if not result or len(result) == 0:
+  if not texts or not texts[0]:
     return ""
+
+  for text in texts[0]:
+    t = text[1][0].upper().replace(" ", "")
+    result += t
+  
   return result
 
 def remove_incorrect_chars(plate_text: str) -> str:
@@ -80,13 +80,11 @@ replacements = {
 def make_replacements(text: str) -> str:
   letters = text[0] + text[4:6]
   numbers = text[1:4]
-  region = ''
-  if len(text) > 6:
-    region = text[6:]
+  region = text[6:] if len(text) > 6 else ""
 
   for k, v in replacements.items():
-    letters.replace(k, v)
-    numbers.replace(v, k)
-    region.replace(v, k)
+    letters = letters.replace(k, v)
+    numbers = numbers.replace(v, k)
+    region = region.replace(v, k)
 
   return f"{letters[0]}{numbers}{letters[1:]} {region}"
