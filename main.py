@@ -3,6 +3,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from ultralytics import YOLO
 from utils import *
+from db import PlateDatabase
 import time
 from datetime import datetime
 
@@ -11,6 +12,7 @@ start_time = time.time()
 acceptable_classes = [2, 6]  # машины и автобусы
 executor = ThreadPoolExecutor(max_workers=2)
 plates_texts = []
+db = PlateDatabase()
 reader = PaddleOCR(use_angle_cls=False, 
                    lang='en', ) # объект для чтения текста с изображения
 
@@ -30,6 +32,8 @@ async def process_video(video_path: str,
     car_model (YOLO, optional): Готовая модель для определения автомобилей на видео,
     plate_model (YOLO, optional): = Готовая модель для определения номерных знаков на видео):
   """
+  await db.init()
+  await db.clear_table()
 
   # Загрузка предварительно обученной модели YOLO
   if car_model is None:
@@ -66,8 +70,9 @@ async def process_video(video_path: str,
         if plate_img is None:
           continue
         plate_text = read_plate_text(plate_img)
+        timestamp = datetime.now()
         if plate_text:
-          tasks.append(handle_plate_text(plate_text))
+          tasks.append(handle_plate_text(plate_text, timestamp))
 
     if len(tasks) >= 10:  # пакетная обработка
       await asyncio.gather(*tasks)
@@ -82,6 +87,7 @@ async def process_video(video_path: str,
       if plate.strip():  # фильтрация пустых строк
         f.write(plate + "\n")
 
+  await db.close()
   end_time = time.time()
   elapsed_time = end_time - start_time
   print(f"The task took {elapsed_time:.2f} seconds to complete.")
@@ -106,14 +112,14 @@ def read_plate_text(plate_img: np.ndarray) -> str:
   
   return result
 
-async def handle_plate_text(text: str):
+async def handle_plate_text(text: str, timestamp: datetime = datetime.now()):
   plate_text = remove_incorrect_chars(text)
   plate_text = make_replacements(plate_text) \
     if len(plate_text) >= 6 else plate_text
   if not is_valid_plate(plate_text):
     return None
 
-  plates_texts.append(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {plate_text}")
+  await db.insert_plate(plate_text, timestamp)
   return plate_text
 
 if __name__ == "__main__":
