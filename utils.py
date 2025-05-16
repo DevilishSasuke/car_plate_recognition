@@ -3,13 +3,11 @@ import numpy as np
 from typing import Optional, Generator, Tuple
 from ultralytics.engine.results import Boxes, Results
 from paddleocr import PaddleOCR
-from re import sub as re_sub
+import re
 
 min_ph = 40 # минимальная высота номера(для увеличения)
 min_pw = 120 # минимальная ширина номера
 plate_alphabet = "ABEKMHOPCTYX0123456789" # алфавит доступных номерных символов
-reader = PaddleOCR(use_angle_cls=False, 
-                   lang='en', ) # объект для чтения текста с изображения
 
 def get_frames(cap: cv2.VideoCapture) -> Generator[np.ndarray, None, None]:
   while cap.isOpened():
@@ -39,23 +37,8 @@ def enlarge_image(img: np.ndarray) -> np.ndarray:
     return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
 
 
-def read_plate_text(plate_img: np.ndarray) -> str:
-  texts = reader.ocr(plate_img, cls=False)
-  print(f"НАЙДЕННЫЙ ТЕКСТ: {texts}")
-
-  result  = ""
-
-  if not texts or not texts[0]:
-    return ""
-
-  for text in texts[0]:
-    t = text[1][0].upper().replace(" ", "")
-    result += t
-  
-  return result
-
 def remove_incorrect_chars(plate_text: str) -> str:
-  return re_sub(fr"[^{plate_alphabet}]", "", plate_text).strip()
+  return re.sub(fr"[^{plate_alphabet}]", "", plate_text).strip()
 
 replacements = { "0": "O", "8": "B", "2": "Z", }
 def make_replacements(text: str) -> str:
@@ -69,3 +52,15 @@ def make_replacements(text: str) -> str:
     region = region.replace(v, k)
 
   return f"{letters[0]}{numbers}{letters[1:]} {region}"
+
+plate_letters = "ABEKMHOPCTYX"
+plate_region = r" \d{2,3}$"
+plate_regexes = [
+    re.compile(rf"^[{plate_letters}]\d{{3}}[{plate_letters}]{{2}}{plate_region}"),  # A000AA 000
+    re.compile(rf"^[{plate_letters}]{{2}}\d{{3}}{plate_region}"),                   # AA000 000
+    re.compile(rf"^[{plate_letters}]{{2}}\d{{4}}{plate_region}"),                   # AA0000 000
+    re.compile(rf"^\d{{4}}[{plate_letters}]{{2}}{plate_region}"),                   # 0000AA 000
+]
+
+def is_valid_plate(text: str) -> bool:
+    return any(regex.match(text) for regex in plate_regexes)

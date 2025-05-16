@@ -4,12 +4,15 @@ from concurrent.futures import ThreadPoolExecutor
 from ultralytics import YOLO
 from utils import *
 import time
+from datetime import datetime
 
 start_time = time.time()
 
 acceptable_classes = [2, 6]  # машины и автобусы
 executor = ThreadPoolExecutor(max_workers=2)
 plates_texts = []
+reader = PaddleOCR(use_angle_cls=False, 
+                   lang='en', ) # объект для чтения текста с изображения
 
 async def process_video(video_path: str, 
                         car_model_path: Optional[str] = "yolo11m.pt",
@@ -92,28 +95,26 @@ def detect_plates_in_vehicle(vehicle_img: np.ndarray,
     return plate_img
   return None
 
-async def handle_plate_text(text: str):
-  corrected_text = remove_incorrect_chars(text)
-  corrected_text = make_replacements(corrected_text) \
-    if len(corrected_text) >= 6 else corrected_text
-  plates_texts.append(corrected_text)
-  return corrected_text
-
-async def async_recognize_plate(plate_img):
-  result = await asyncio.get_event_loop().run_in_executor(executor, sync_recognize_plate, plate_img)
-  plates_texts.append(result)
-  return
-
-def sync_recognize_plate(plate_img):
-  plate_img = enlarge_image(plate_img)
-  text = read_plate_text(plate_img)
+def read_plate_text(plate_img: np.ndarray) -> str:
+  texts = reader.ocr(plate_img, cls=False)
+  result  = ""
+  if not texts or not texts[0]:
+    return ""
+  for text in texts[0]:
+    t = text[1][0].upper().replace(" ", "")
+    result += t
   
-  if text:
-    corrected_text = remove_incorrect_chars(text)
-    return make_replacements(corrected_text) \
-      if len(corrected_text) >= 6 else corrected_text
-  return ""
+  return result
 
+async def handle_plate_text(text: str):
+  plate_text = remove_incorrect_chars(text)
+  plate_text = make_replacements(plate_text) \
+    if len(plate_text) >= 6 else plate_text
+  if not is_valid_plate(plate_text):
+    return None
+
+  plates_texts.append(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} {plate_text}")
+  return plate_text
 
 if __name__ == "__main__":
   asyncio.run(process_video(
