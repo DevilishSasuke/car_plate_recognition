@@ -12,9 +12,7 @@ class PlateDatabase:
     self.database = os.getenv("DB_NAME")
     self.host = os.getenv("DB_HOST")
     self.port = int(os.getenv("DB_PORT", 5432))
-    # Время в секундах, когда повторяющийся знак не будет вновь записан
-    self.plate_cooldown = 20 
-    self.poll = None
+    self.pool = None
 
   async def init(self):
     self.pool = await asyncpg.create_pool(
@@ -40,17 +38,10 @@ class PlateDatabase:
 
   async def insert_plate(self, plate: str, timestamp: datetime):
     async with self.pool.acquire() as conn:
-      # Проверка, был ли уже такой номер в последние 20 секунд
-      recent_time = timestamp - timedelta(seconds=self.plate_cooldown)
-      existing = await conn.fetchrow(
-        "SELECT 1 FROM plates WHERE plate = $1 AND timestamp >= $2",
-        plate, recent_time
+      await conn.execute(
+        "INSERT INTO plates (timestamp, plate) VALUES ($1, $2)",
+        timestamp, plate
       )
-      if existing is None:
-        await conn.execute(
-          "INSERT INTO plates (timestamp, plate) VALUES ($1, $2)",
-          timestamp, plate
-        )
 
   async def get_all(self):
     async with self.pool.acquire() as conn:
@@ -60,12 +51,9 @@ class PlateDatabase:
     async with self.pool.acquire() as conn:
       await conn.execute("""
         DROP TABLE IF EXISTS plates;
-        CREATE TABLE IF NOT EXISTS plates (
-          id SERIAL PRIMARY KEY,
-          timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          plate TEXT NOT NULL
-        );
       """)
+    await self._init_schema()
+    
 
   async def close(self):
     if self.pool:
