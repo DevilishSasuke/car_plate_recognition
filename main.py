@@ -9,7 +9,6 @@ from utils import *
 from db import PlateDatabase
 
 
-start_time = time.time()
 
 acceptable_classes = [2, 6]  # машины и автобусы
 executor = ThreadPoolExecutor(max_workers=2)
@@ -21,6 +20,7 @@ reader = PaddleOCR(use_angle_cls=False,
                    lang='en', 
                    show_log=False) # объект для чтения текста с изображения
 
+start_time = time.time()
 async def process_video(video_path: str, 
                         car_model_path: Optional[str] = "yolo11m.pt",
                         plate_model_path: Optional[str] = "model/plates.pt",
@@ -54,9 +54,10 @@ async def process_video(video_path: str,
   frame_count = 0
   for frame in get_frames(cap):
     frame_count += 1
-    if frame_count % 3 != 0:
+    if frame_count % 5 != 0:
       continue
 
+    
     # Обнаружение объектов с помощью YOLO
     car_results = car_model.predict(source=frame, save=False, verbose=False)
 
@@ -66,7 +67,6 @@ async def process_video(video_path: str,
         
         x1, y1, x2, y2 = map(int, cbox.xyxy[0].tolist())
         vehicle_img = frame[y1:y2, x1:x2]
-
         # Обнаружение номерных знаков на обнаруженных машинах
         plate_img = detect_plates_in_vehicle(vehicle_img, plate_model)
         if plate_img is None:
@@ -75,6 +75,7 @@ async def process_video(video_path: str,
         timestamp = datetime.now()
         if plate_text:
           await handle_plate_text(plate_text, timestamp)
+
 
   await db.close()
   end_time = time.time()
@@ -91,13 +92,14 @@ def detect_plates_in_vehicle(vehicle_img: np.ndarray,
   return None
 
 def read_plate_text(plate_img: np.ndarray) -> str:
-  texts = reader.ocr(plate_img, cls=False)
+  texts = reader.ocr(plate_img, cls=False, det=False)
   result  = ""
   if not texts or not texts[0]:
     return ""
-  for text in texts[0]:
-    t = text[1][0].upper().replace(" ", "")
+  for text_info in texts[0]:
+    t = text_info[0].upper().replace(" ", "")
     result += t
+
   
   return result
 
